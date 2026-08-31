@@ -21,26 +21,37 @@ SCALER_PATH = os.path.join(BASE_DIR, "ml", "saved_models", "scaler.pkl")
 _model_data = None
 _scaler = None
 _shap_explainer = None
+_model_load_failed = False
 
 def load_model_assets():
-    global _model_data, _scaler, _shap_explainer
-    if _model_data is None:
+    global _model_data, _scaler, _shap_explainer, _model_load_failed
+    if _model_data is None and not _model_load_failed:
         if not os.path.exists(MODEL_PATH) or not os.path.exists(SCALER_PATH):
-            raise FileNotFoundError("Model or Scaler binary not found. Please train the model first.")
+            print(f"Model files not found at {MODEL_PATH} or {SCALER_PATH}. Using heuristic predictions.")
+            _model_load_failed = True
+            return
         
-        _model_data = joblib.load(MODEL_PATH)
-        _scaler = joblib.load(SCALER_PATH)
-        
-        # Initialize SHAP explainer
-        if SHAP_AVAILABLE:
-            try:
-                # The model is inside model_data dict
-                model = _model_data['model']
-                # Create a TreeExplainer for tree models (Random Forest or Gradient Boosting)
-                _shap_explainer = shap.TreeExplainer(model)
-            except Exception as e:
-                print(f"Failed to initialize SHAP TreeExplainer: {e}. Falling back to heuristics.")
-                _shap_explainer = None
+        try:
+            _model_data = joblib.load(MODEL_PATH)
+            _scaler = joblib.load(SCALER_PATH)
+            print("ML model and scaler loaded successfully.")
+            
+            # Initialize SHAP explainer
+            if SHAP_AVAILABLE:
+                try:
+                    # The model is inside model_data dict
+                    model = _model_data['model']
+                    # Create a TreeExplainer for tree models (Random Forest or Gradient Boosting)
+                    _shap_explainer = shap.TreeExplainer(model)
+                except Exception as e:
+                    print(f"Failed to initialize SHAP TreeExplainer: {e}. Falling back to heuristics.")
+                    _shap_explainer = None
+        except Exception as e:
+            print(f"Failed to load model or scaler: {e}. Using heuristic predictions instead.")
+            _model_data = None
+            _scaler = None
+            _shap_explainer = None
+            _model_load_failed = True
 
 def engineer_single_record(data: Dict) -> pd.DataFrame:
     """
@@ -161,66 +172,132 @@ def get_heuristic_attributions(inputs: Dict, prediction_class: int) -> Dict[str,
         
     return attributions
 
+def get_heuristic_prediction(inputs: Dict) -> Tuple[int, float]:
+    """
+    Generate a heuristic-based risk prediction without a trained model.
+    Returns (pred_class, confidence) based on physical rules.
+    """
+    dist = inputs['relative_distance']
+    rel_v = inputs['relative_velocity']
+    inc = inputs['inclination']
+    
+    # Risk scoring algorithm based on orbital mechanics
+    risk_score = 0.0
+    
+    # Distance factor: closer = higher risk (exponential)
+    if dist < 0.1:
+        risk_score += 1.0
+    elif dist < 0.5:
+        risk_score += 0.9
+    elif dist < 1.0:
+        risk_score += 0.7
+    elif dist < 2.0:
+        risk_score += 0.5
+    elif dist < 5.0:
+        risk_score += 0.3
+    else:
+        risk_score += 0.0
+    
+    # Relative velocity factor: higher = higher risk
+    if rel_v > 15.0:
+        risk_score += 0.5
+    elif rel_v > 10.0:
+        risk_score += 0.3
+    elif rel_v > 5.0:
+        risk_score += 0.15
+    
+    # Inclination factor: polar orbits (80-100 deg) are more congested
+    if 80.0 <= inc <= 100.0:
+        risk_score += 0.2
+    elif 70.0 <= inc <= 110.0:
+        risk_score += 0.1
+    
+    # Normalize risk_score to [0, 1]
+    risk_score = min(1.0, risk_score)
+    
+    # Map to prediction class
+    if risk_score >= 0.6:
+        pred_class = 2  # High Risk
+        confidence = min(0.95, 0.6 + (risk_score - 0.6) * 2)
+    elif risk_score >= 0.3:
+        pred_class = 1  # Medium Risk
+        confidence = min(0.85, 0.5 + (risk_score - 0.3) * 1.5)
+    else:
+        pred_class = 0  # Low Risk
+        confidence = min(0.95, (1 - risk_score) * 0.9 + 0.1)
+    
+    return pred_class, confidence
+
+
 def predict_collision_risk(inputs: Dict) -> Tuple[str, float, List[str], Dict[str, float]]:
     """
     Main prediction logic:
     1. Preprocesses the input record.
-    2. Runs model inference.
+    2. Runs model inference (or uses heuristic fallback).
     3. Computes SHAP values or heuristic attributions.
     4. Generates explanation list.
     """
     load_model_assets()
     
-    # Feature engineering
-    df_engineered = engineer_single_record(inputs)
-    feature_cols = _model_data['features']
-    X = df_engineered[feature_cols]
-    
-    # Scale
-    X_scaled = _scaler.transform(X)
-    
-    # Predict
-    model = _model_data['model']
-    probs = model.predict_proba(X_scaled)[0]
-    pred_class = int(np.argmax(probs))
-    confidence = float(probs[pred_class])
-    
-    # Map predictions classes back to text
-    class_map = {0: "Low Risk", 1: "Medium Risk", 2: "High Risk"}
-    prediction_text = class_map[pred_class]
-    
-    # Compute attributions
-    attributions = {}
-    if _shap_explainer is not None:
-        try:
-            # Get SHAP values for this instance
-            # shap_values is a list of arrays (one per class)
-            # or a 3D array [samples, features, classes]
-            raw_shap = _shap_explainer.shap_values(X_scaled)
-            
-            # Extract shap values for the predicted class
-            if isinstance(raw_shap, list):
-                # GradientBoosting / RandomForest inside scikit-learn
-                # list contains [array(n_samples, n_features)] * n_classes
-                class_shap = raw_shap[pred_class][0]
-            elif isinstance(raw_shap, np.ndarray) and len(raw_shap.shape) == 3:
-                # Shape is (samples, features, classes)
-                class_shap = raw_shap[0, :, pred_class]
-            elif isinstance(raw_shap, np.ndarray) and len(raw_shap.shape) == 2:
-                # Sometimes shap returns a 2D array if model is binary, but we have 3 classes
-                class_shap = raw_shap[0]
-            else:
-                # General fallback
-                class_shap = raw_shap[0]
-                
-            # Map back to feature names
-            for name, val in zip(feature_cols, class_shap):
-                attributions[name] = float(val)
-        except Exception as e:
-            print(f"SHAP inference failed: {e}. Using fallback.")
-            attributions = get_heuristic_attributions(inputs, pred_class)
-    else:
+    # Check if model was successfully loaded
+    if _model_data is None:
+        # Use heuristic prediction
+        pred_class, confidence = get_heuristic_prediction(inputs)
+        class_map = {0: "Low Risk", 1: "Medium Risk", 2: "High Risk"}
+        prediction_text = class_map[pred_class]
         attributions = get_heuristic_attributions(inputs, pred_class)
+    else:
+        # Use the trained model
+        # Feature engineering
+        df_engineered = engineer_single_record(inputs)
+        feature_cols = _model_data['features']
+        X = df_engineered[feature_cols]
+        
+        # Scale
+        X_scaled = _scaler.transform(X)
+        
+        # Predict
+        model = _model_data['model']
+        probs = model.predict_proba(X_scaled)[0]
+        pred_class = int(np.argmax(probs))
+        confidence = float(probs[pred_class])
+        
+        # Map predictions classes back to text
+        class_map = {0: "Low Risk", 1: "Medium Risk", 2: "High Risk"}
+        prediction_text = class_map[pred_class]
+        
+        # Compute attributions
+        attributions = {}
+        if _shap_explainer is not None:
+            try:
+                # Get SHAP values for this instance
+                # shap_values is a list of arrays (one per class)
+                # or a 3D array [samples, features, classes]
+                raw_shap = _shap_explainer.shap_values(X_scaled)
+                
+                # Extract shap values for the predicted class
+                if isinstance(raw_shap, list):
+                    # GradientBoosting / RandomForest inside scikit-learn
+                    # list contains [array(n_samples, n_features)] * n_classes
+                    class_shap = raw_shap[pred_class][0]
+                elif isinstance(raw_shap, np.ndarray) and len(raw_shap.shape) == 3:
+                    # Shape is (samples, features, classes)
+                    class_shap = raw_shap[0, :, pred_class]
+                elif isinstance(raw_shap, np.ndarray) and len(raw_shap.shape) == 2:
+                    # Sometimes shap returns a 2D array if model is binary, but we have 3 classes
+                    class_shap = raw_shap[0]
+                else:
+                    # General fallback
+                    class_shap = raw_shap[0]
+                    
+                # Map back to feature names
+                for name, val in zip(feature_cols, class_shap):
+                    attributions[name] = float(val)
+            except Exception as e:
+                print(f"SHAP inference failed: {e}. Using fallback.")
+                attributions = get_heuristic_attributions(inputs, pred_class)
+        else:
+            attributions = get_heuristic_attributions(inputs, pred_class)
         
     # Clean up engineered features for a cleaner user display of feature importances
     # Map engineered features back to user-friendly names

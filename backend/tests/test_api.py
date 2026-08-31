@@ -5,8 +5,8 @@ import unittest
 # Add backend and parent directory to PYTHONPATH to allow imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.app.services.ml_service import predict_collision_risk, load_model_assets
-from backend.app.services.satellite_service import calculate_orbital_elements
+from app.services.ml_service import predict_collision_risk, load_model_assets
+from app.services.satellite_service import calculate_orbital_elements
 
 class TestSpaceShieldAPI(unittest.TestCase):
 

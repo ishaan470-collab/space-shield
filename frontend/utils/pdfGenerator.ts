@@ -20,7 +20,7 @@ export function generateCollisionReport(prediction: PredictResponse): void {
   doc.setTextColor(6, 182, 212);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(24);
-  doc.text("SpaceShield AI", 15, 20);
+  doc.text("SpaceShield", 15, 20);
 
   // Subtitle
   doc.setTextColor(156, 163, 175);

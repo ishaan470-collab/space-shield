@@ -5,15 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from backend.app.database import get_db
-from backend.app.models.models import PredictionHistory, User
-from backend.app.models.schemas import (
+from app.database import get_db
+from app.models.models import PredictionHistory, User
+from app.models.schemas import (
     PredictRequest, PredictResponse, PredictionHistoryResponse,
     SatelliteSearchResponse, AnalyticsDashboardResponse, RiskDistribution
 )
-from backend.app.api.auth import get_current_user
-from backend.app.services.satellite_service import search_satellite
-from backend.app.services.ml_service import predict_collision_risk
+from app.api.auth import get_current_user
+from app.services.satellite_service import search_satellite
+from app.services.ml_service import predict_collision_risk
 
 router = APIRouter(tags=["Predictions & Satellites"])
 

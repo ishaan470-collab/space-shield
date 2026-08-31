@@ -1,14 +1,14 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.app.database import engine, Base
-from backend.app.api import auth, predictions
+from app.database import engine, Base
+from app.api import auth, predictions
 
 # Create database tables at startup
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="SpaceShield AI API",
+    title="SpaceShield API",
     description="Backend API for predicting satellite collision risks using Machine Learning and live orbital data.",
     version="1.0.0"
 )
@@ -32,7 +32,7 @@ app.include_router(predictions.router)
 def read_root():
     return {
         "status": "online",
-        "service": "SpaceShield AI API",
+        "service": "SpaceShield API",
         "description": "AI-Powered Space Situational Awareness & Satellite Collision Risk Prediction Platform"
     }
 

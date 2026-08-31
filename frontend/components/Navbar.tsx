@@ -103,7 +103,7 @@ export default function Navbar() {
               <Shield className="w-5 h-5 text-white animate-pulse" />
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent tracking-wide">
-              SpaceShield<span className="text-white text-xs ml-1 font-semibold border border-cyan-500/30 px-1.5 py-0.5 rounded-full uppercase">AI</span>
+              SpaceShield
             </span>
           </Link>
 

@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import jwt
 
-from backend.app.database import get_db
-from backend.app.models.models import User
-from backend.app.models.schemas import UserCreate, UserLogin, Token, UserResponse
+from app.database import get_db
+from app.models.models import User
+from app.models.schemas import UserCreate, UserLogin, Token, UserResponse
 
 # JWT Settings
 SECRET_KEY = os.getenv("SECRET_KEY", "spaceshield_super_secret_key_12345_abcde")
@@ -19,7 +19,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 # Password hashing configuration
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 # OAuth2 scheme for dependency injection
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login-form-url", auto_error=False)

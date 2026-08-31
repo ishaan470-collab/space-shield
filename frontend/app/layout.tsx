@@ -3,8 +3,8 @@ import "./globals.css";
 import Navbar from "../components/Navbar";
 
 export const metadata: Metadata = {
-  title: "SpaceShield AI | Satellite Collision Risk Prediction Platform",
-  description: "AI-powered space situational awareness and collision risk prediction using orbital mechanics and live telemetry.",
+  title: "SpaceShield | Satellite Collision Risk Prediction Platform",
+  description: "Space situational awareness and collision risk prediction using orbital mechanics and live telemetry.",
 };
 
 export default function RootLayout({
@@ -14,9 +14,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full scroll-smooth">
-      <body className="min-h-full flex flex-col bg-[#030712] text-gray-100 antialiased font-sans relative">
+      <body className="min-h-full flex flex-col bg-[#02040a] text-gray-100 antialiased font-sans relative cyber-grid">
         {/* Starry deep space background overlay */}
         <div className="stars-overlay fixed inset-0 z-0 pointer-events-none" />
+        
+        {/* Fine cyber-grid background layer */}
+        <div className="cyber-grid-cyan fixed inset-0 z-0 opacity-40 pointer-events-none" />
 
         {/* Dynamic Client Navbar */}
         <Navbar />
@@ -30,7 +33,7 @@ export default function RootLayout({
         <footer className="glass-panel border-t border-white/10 py-6 relative z-10 text-center text-xs text-gray-500">
           <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <span className="font-mono">
-              &copy; {new Date().getFullYear()} SpaceShield AI Operations. All rights reserved.
+              &copy; {new Date().getFullYear()} SpaceShield Operations. All rights reserved.
             </span>
             <div className="flex gap-4">
               <a href="https://celestrak.org" target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400 transition-colors">

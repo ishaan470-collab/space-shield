@@ -3,8 +3,8 @@ import math
 import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
-from backend.app.models.models import SatelliteCache
-from backend.app.models.schemas import SatelliteSearchResponse
+from app.models.models import SatelliteCache
+from app.models.schemas import SatelliteSearchResponse
 
 # Earth parameters
 GM = 398600.44  # km^3/s^2
